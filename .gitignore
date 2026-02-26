@@ -6,14 +6,18 @@ dist/
 debug-vault/.obsidian/*
 !debug-vault/.obsidian/.gitkeep
 debug-vault/.hotreload
+# Ignore debug-vault data files (regenerated via setup)
+debug-vault/
 
 # Temporary local planning docs
 specs/
 
 # Local tool/cache directories
-.kiro/
+.kiro/*
 !.kiro/steering/
 !.kiro/settings/
+!.kiro/steering/**
+!.kiro/settings/**
 .kiro/specs/
 !AGENTS.md
 .opencode/
