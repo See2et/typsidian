@@ -23,7 +23,7 @@ describe("PreviewOutputPublisher", () => {
 
     const artifactPath = publisher.computeOutputPath(target);
 
-    expect(artifactPath).toBe(`${dirname(target.filePath)}/${"sample"}.pdf`);
+    expect(artifactPath).toBe(join(dirname(target.filePath), "sample.pdf"));
   });
 
   it("uses same output path for repeated compute", () => {

@@ -1,12 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { PreviewContextResolver } from "./previewContextResolver";
 
 describe("PreviewContextResolver", () => {
-  afterEach(() => {
-    void 0;
-  });
-
   it("returns active .typ target", () => {
     const targetFile = { path: "notes/sample.typ", extension: "typ" };
     const resolver = new PreviewContextResolver(() => targetFile);
@@ -23,7 +19,7 @@ describe("PreviewContextResolver", () => {
     });
   });
 
-it("accepts uppercase typ file extensions", () => {
+  it("accepts uppercase typ file extensions", () => {
     const targetFile = { path: "notes/sample.TYP", extension: "TYP" };
     const resolver = new PreviewContextResolver(() => targetFile);
 
