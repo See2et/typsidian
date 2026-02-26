@@ -12,4 +12,8 @@ specs/
 
 # Local tool/cache directories
 .kiro/
+!.kiro/steering/
+!.kiro/settings/
+.kiro/specs/
+!AGENTS.md
 .opencode/
