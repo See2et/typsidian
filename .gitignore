@@ -9,3 +9,7 @@ debug-vault/.obsidian/plugins/
 
 # Temporary local planning docs
 specs/
+
+# Local tool/cache directories
+.kiro/
+.opencode/
