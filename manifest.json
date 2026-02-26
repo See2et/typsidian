@@ -1,0 +1,10 @@
+{
+  "id": "typsidian",
+  "name": "Typsidian",
+  "version": "0.0.1",
+  "minAppVersion": "1.5.0",
+  "description": "Typst live preview and editing plugin for Obsidian",
+  "author": "See2et",
+  "authorUrl": "https://github.com/See2et",
+  "isDesktopOnly": false
+}
