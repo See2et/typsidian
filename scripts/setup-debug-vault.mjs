@@ -1,4 +1,4 @@
-import { mkdir, readFile, symlink, writeFile, lstat, rm } from "node:fs/promises";
+import { readlink, realpath, mkdir, readFile, symlink, writeFile, lstat, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,6 +33,28 @@ async function ensureSymlink() {
   try {
     const stats = await lstat(pluginLinkPath);
     if (stats.isSymbolicLink()) {
+      try {
+        const linkTarget = await readlink(pluginLinkPath);
+        const resolvedTarget = resolve(dirname(pluginLinkPath), linkTarget);
+        const realTarget = await realpath(resolvedTarget);
+        const realRoot = await realpath(root);
+
+        if (realTarget === realRoot) {
+          return;
+        }
+
+        console.warn("[typsidian] existing plugin symlink points to invalid target", {
+          pluginLinkPath,
+          resolvedTarget,
+        });
+      } catch {
+        console.warn("[typsidian] invalid plugin symlink detected", {
+          pluginLinkPath,
+        });
+      }
+
+      await rm(pluginLinkPath, { recursive: true, force: true });
+      await symlink(root, pluginLinkPath, "dir");
       return;
     }
     await rm(pluginLinkPath, { recursive: true, force: true });

@@ -15,11 +15,17 @@ async function ensureHotReloadRepo() {
   await mkdir(vaultPluginsDir, { recursive: true });
   try {
     await execFileAsync("git", ["-C", hotReloadDir, "rev-parse", "--is-inside-work-tree"]);
-    await execFileAsync("git", ["-C", hotReloadDir, "pull", "--ff-only"]);
-    console.log("[typsidian] hot-reload updated");
   } catch {
     await execFileAsync("git", ["clone", "https://github.com/pjeby/hot-reload.git", hotReloadDir]);
     console.log("[typsidian] hot-reload installed");
+    return;
+  }
+
+  try {
+    await execFileAsync("git", ["-C", hotReloadDir, "pull", "--ff-only"]);
+    console.log("[typsidian] hot-reload updated");
+  } catch (error) {
+    console.error("[typsidian] failed to update hot-reload", error);
   }
 }
 

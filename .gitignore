@@ -5,7 +5,6 @@ dist/
 # Obsidian debug vault runtime files
 debug-vault/.obsidian/*
 !debug-vault/.obsidian/.gitkeep
-debug-vault/.obsidian/plugins/
 debug-vault/.hotreload
 
 # Temporary local planning docs

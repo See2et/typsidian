@@ -52,7 +52,7 @@ export default class TypsidianPlugin extends Plugin {
     if (!this.isTypFileAccessible(file)) {
       this.restoreActiveLeaf(this.previousActiveLeaf);
       new Notice(
-        ".typ ファイルを開けませんでした。ファイルを開封できる状態を確認してください",
+        ".typ ファイルを開けませんでした。ファイルが開ける状態か確認してください",
       );
       return;
     }
