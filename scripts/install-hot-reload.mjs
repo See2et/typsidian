@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
 
-const root = resolve(new URL("..", import.meta.url).pathname);
+const root = resolve(dirname(fileURLToPath(import.meta.url)));
 const vaultPluginsDir = resolve(root, "debug-vault", ".obsidian", "plugins");
 const hotReloadDir = resolve(vaultPluginsDir, "hot-reload");
 const communityPluginsPath = resolve(root, "debug-vault", ".obsidian", "community-plugins.json");

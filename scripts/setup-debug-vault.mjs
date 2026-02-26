@@ -1,7 +1,8 @@
 import { mkdir, readFile, symlink, writeFile, lstat, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve(new URL("..", import.meta.url).pathname);
+const root = resolve(dirname(fileURLToPath(import.meta.url)));
 const vaultDir = resolve(root, "debug-vault");
 const obsidianDir = resolve(vaultDir, ".obsidian");
 const pluginsDir = resolve(obsidianDir, "plugins");
@@ -50,7 +51,7 @@ await ensureCommunityPluginsJson();
 await ensureSymlink();
 
 await writeFile(
-  resolve(root, ".hotreload"),
+  resolve(vaultDir, ".hotreload"),
   "enabled\n",
   "utf8"
 );

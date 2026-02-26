@@ -6,6 +6,7 @@ dist/
 debug-vault/.obsidian/*
 !debug-vault/.obsidian/.gitkeep
 debug-vault/.obsidian/plugins/
+debug-vault/.hotreload
 
 # Temporary local planning docs
 specs/

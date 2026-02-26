@@ -41,18 +41,6 @@ export default class TypsidianPlugin extends Plugin {
       this.app.workspace.on("file-open", this.handleFileOpen),
     );
 
-    this.addRibbonIcon("sigma", "Typsidian: Debug ping", () => {
-      new Notice("Typsidian loaded in debug vault");
-    });
-
-    this.addCommand({
-      id: "typsidian-dev-ping",
-      name: "Typsidian: Debug ping",
-      callback: () => {
-        new Notice("Typsidian command OK");
-      },
-    });
-
     console.info("[typsidian] plugin loaded");
   }
 
@@ -171,7 +159,7 @@ export default class TypsidianPlugin extends Plugin {
   }
 
   private isTypFile(file: TAbstractFile): file is TFile {
-    return file instanceof TFile && file.extension === TYP_EXTENSION;
+    return file instanceof TFile && file.extension.toLowerCase() === TYP_EXTENSION;
   }
 
   private getLeafByTypFile(path: string): WorkspaceLeaf | null {
