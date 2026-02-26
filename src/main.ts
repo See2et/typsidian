@@ -8,6 +8,21 @@ import {
   TFolder,
   WorkspaceLeaf,
 } from "obsidian";
+import { ChildProcess, spawn } from "node:child_process";
+import { join } from "node:path";
+import {
+  PREVIEW_COMMAND_ID,
+  PREVIEW_COMMAND_NAME,
+} from "./preview/contracts";
+import { DefaultPreviewCommandController } from "./preview/previewCommandController";
+import { PreviewContextResolver } from "./preview/previewContextResolver";
+import { PrerequisiteDiscoveryService } from "./preview/prerequisiteDiscoveryService";
+import { PreviewFailurePolicy } from "./preview/previewFailurePolicy";
+import { NodeExternalCliRunner } from "./preview/externalCliRunner";
+import { PreviewOutputPresenter } from "./preview/previewOutputPresenter";
+import { DefaultPreviewExecutionService } from "./preview/previewExecutionService";
+import { PreviewOutputPublisher } from "./preview/previewOutputPublisher";
+import { PluginStateGuard } from "./preview/pluginStateGuard";
 
 const TYP_EXTENSION = "typ";
 const TYP_VIEW = "markdown";
@@ -31,6 +46,7 @@ export default class TypsidianPlugin extends Plugin {
       this.registerExtensions(Array.from(TYP_FILE_EXTENSIONS), TYP_VIEW);
       this.registerTypLifecycleObserver();
       this.registerTypContextMenuActions();
+      this.registerPreviewCommand();
       this.logStartupState();
     });
 
@@ -102,6 +118,188 @@ export default class TypsidianPlugin extends Plugin {
         },
       ),
     );
+  }
+
+  private registerPreviewCommand(): void {
+    const commandController = this.createPreviewCommandController();
+
+    this.addCommand({
+      id: PREVIEW_COMMAND_ID,
+      name: PREVIEW_COMMAND_NAME,
+      checkCallback: (checking) => {
+        const isAvailable = commandController.isCommandAvailable();
+
+        if (checking) {
+          return isAvailable;
+        }
+
+        if (!isAvailable) {
+          return false;
+        }
+
+        void commandController.runFromCurrentContext();
+        return true;
+      },
+    });
+  }
+
+  private createPreviewCommandController(): DefaultPreviewCommandController {
+    const getActiveLike = () => {
+      const activeFile = this.app.workspace.getActiveFile();
+      if (!activeFile) {
+        return null;
+      }
+
+      return {
+        path: activeFile.path,
+        extension: activeFile.extension,
+      };
+    };
+
+    const vaultBasePath = this.getVaultBasePath();
+
+    const runner = new NodeExternalCliRunner();
+    const outputPublisher = new PreviewOutputPublisher();
+    const execution = new DefaultPreviewExecutionService(
+      runner,
+      outputPublisher,
+      vaultBasePath ? { cwd: vaultBasePath } : {},
+    );
+    const presenter = new PreviewOutputPresenter(
+      (path) => this.openBySystem(this.resolveVaultPath(path)),
+      (path) => {
+        void this.revealInOs(this.resolveVaultPath(path));
+      },
+    );
+    const failurePolicy = new PreviewFailurePolicy();
+    const stateGuard = new PluginStateGuard(
+      () => this.currentActiveLeaf,
+      (leaf) => this.restoreActiveLeaf(leaf),
+    );
+    const runtime = new PrerequisiteDiscoveryService({
+      verify: (commandName) =>
+        new Promise<boolean>((resolve) => {
+          const testProcess = spawn(commandName, ["--version"], {
+            stdio: ["ignore", "ignore", "pipe"],
+            cwd: vaultBasePath ?? undefined,
+          });
+
+          testProcess.on("error", () => {
+            resolve(false);
+          });
+
+          testProcess.on("close", (code) => {
+            resolve(code === 0 || code === null);
+          });
+        }),
+    });
+
+    return new DefaultPreviewCommandController({
+      resolver: new PreviewContextResolver(getActiveLike),
+      runtime,
+      execution,
+      presenter,
+      failurePolicy,
+      stateGuard,
+      onNotice: (message) => new Notice(message),
+    });
+  }
+
+  private openBySystem(path: string): Promise<string | null> {
+    return new Promise<string | null>((resolve) => {
+      const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+      const args =
+        process.platform === "win32"
+          ? ["/c", "start", path]
+          : process.platform === "darwin"
+            ? [path]
+            : [path];
+
+      let child: ChildProcess;
+      try {
+        child = spawn(command, args, {
+          stdio: ["ignore", "ignore", "pipe"],
+        });
+      } catch (error) {
+        resolve(`open command failed: ${String(error)}`);
+        return;
+      }
+
+      let stderr = "";
+      child.stderr?.on("data", (chunk) => {
+        stderr += String(chunk);
+      });
+
+      child.on("error", (error) => {
+        resolve(`open command failed: ${String(error)}`);
+      });
+
+      child.on("close", (code) => {
+        if (code === 0 || code === null) {
+          resolve(null);
+          return;
+        }
+
+        if (stderr.length > 0) {
+          resolve(`open command failed: ${stderr}`);
+          return;
+        }
+
+        resolve(`open command failed with exit code ${String(code)}`);
+      });
+    });
+  }
+
+  private async revealInOs(path: string): Promise<void> {
+    const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+    const args =
+      process.platform === "win32"
+        ? ["/c", "start", path]
+        : process.platform === "darwin"
+          ? ["-R", path]
+          : [path];
+
+    await this.openBySystemWithArgs(command, args);
+  }
+
+  private openBySystemWithArgs(command: string, args: string[]): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let child: ChildProcess;
+      try {
+        child = spawn(command, args, {
+          stdio: ["ignore", "ignore", "ignore"],
+        });
+      } catch {
+        resolve();
+        return;
+      }
+
+      child.on("close", () => resolve());
+      child.on("error", () => resolve());
+    });
+  }
+
+  private resolveVaultPath(relativePath: string): string {
+    const vaultBasePath = this.getVaultBasePath();
+    if (!vaultBasePath) {
+      return relativePath;
+    }
+
+    return join(vaultBasePath, relativePath);
+  }
+
+  private getVaultBasePath(): string | null {
+    const adapter = this.app.vault.adapter;
+    const maybeGetBasePath =
+      "getBasePath" in adapter && typeof adapter.getBasePath === "function"
+        ? adapter.getBasePath
+        : null;
+
+    if (!maybeGetBasePath) {
+      return null;
+    }
+
+    return maybeGetBasePath.call(adapter);
   }
 
   private addNewTypContextMenuItem(menu: Menu, target: TFolder): void {
