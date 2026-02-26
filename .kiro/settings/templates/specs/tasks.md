@@ -11,10 +11,10 @@ Use whichever pattern fits the work breakdown:
 
 ### Major + Sub-task structure
 - [ ] {{MAJOR_NUMBER}}. {{MAJOR_TASK_SUMMARY}}
-- [ ] {{MAJOR_NUMBER}}.{{SUB_NUMBER}} {{SUB_TASK_DESCRIPTION}}{{SUB_PARALLEL_MARK}}
-  - {{DETAIL_ITEM_1}}
-  - {{DETAIL_ITEM_2}}
-  - _Requirements: {{REQUIREMENT_IDS}}_ *(IDs only; do not add descriptions or parentheses.)*
+  - [ ] {{MAJOR_NUMBER}}.{{SUB_NUMBER}} {{SUB_TASK_DESCRIPTION}}{{SUB_PARALLEL_MARK}}
+    - {{DETAIL_ITEM_1}}
+    - {{DETAIL_ITEM_2}}
+    - _Requirements: {{REQUIREMENT_IDS}}_ *(IDs only; do not add descriptions or parentheses.)*
 
 > **Parallel marker**: Append ` (P)` only to tasks that can be executed in parallel. Omit the marker when running in `--sequential` mode.
 >

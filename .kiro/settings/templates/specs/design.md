@@ -10,7 +10,8 @@
 - Use diagrams and tables over lengthy prose
 
 **Warning**: Approaching 1000 lines indicates excessive feature complexity that may require design simplification.
----
+
+***
 
 > Sections may be reordered (e.g., surfacing Requirements Traceability earlier or moving Data Models nearer Architecture) when it improves clarity. Within each section, keep the flow **Summary → Scope → Decisions → Impacts/Risks** so reviewers can scan consistently.
 
@@ -93,9 +94,11 @@ Map each requirement ID (e.g., `2.1`) to the design elements that realize it.
 Provide a quick reference before diving into per-component details.
 
 - Summaries can be a table or compact list. Example table:
+
   | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
   |-----------|--------------|--------|--------------|--------------------------|-----------|
   | ExampleComponent | UI | Displays XYZ | 1, 2 | GameProvider (P0), MapPanel (P1) | Service, State |
+
 - Only components introducing new boundaries (e.g., logic hooks, external integrations, persistence) require full detail blocks. Simple presentation components can rely on the summary row plus a short Implementation Note.
 
 Group detailed blocks by domain or architectural layer. For each detailed component, list requirement IDs as `2.1, 2.3` (omit “Requirement”). When multiple UI components share the same contract, reference a base interface/props definition instead of duplicating code blocks.
@@ -135,6 +138,7 @@ interface [ComponentName]Service {
 - Invariants:
 
 ##### API Contract
+
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
 | POST | /api/resource | CreateRequest | Resource | 400, 409, 500 |

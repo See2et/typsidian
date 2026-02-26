@@ -66,4 +66,4 @@ Authorization: Bearer {token}
 Return pagination metadata in `meta`.
 
 ---
-_Focus on patterns and decisions, not endpoint catalogs._
+*Focus on patterns and decisions, not endpoint catalogs.*

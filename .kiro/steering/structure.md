@@ -35,4 +35,4 @@
 
 ## 追加原則
 - 変更は既存パターンに従う限り、`steering` の都度更新が不要。
-- テスト・CI 設定が未導入のため、最小検証は `npm run build` と LSP 診断で担保。
+- CI の有無にかかわらず、最小検証は `npm run typecheck`、`npm run test`、`npm run build`、LSP 診断で担保。
