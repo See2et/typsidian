@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+
+# Obsidian debug vault runtime files
+debug-vault/.obsidian/*
+!debug-vault/.obsidian/.gitkeep
+debug-vault/.obsidian/plugins/
+
+# Temporary local planning docs
+specs/
