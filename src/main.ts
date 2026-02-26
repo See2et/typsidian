@@ -1,4 +1,5 @@
 import {
+  getIcon,
   MarkdownView,
   Menu,
   Notice,
@@ -26,6 +27,8 @@ import { PluginStateGuard } from "./preview/pluginStateGuard";
 
 const TYP_EXTENSION = "typ";
 const TYP_VIEW = "markdown";
+const PREVIEW_ICON_PRIMARY = "panel-right-open";
+const PREVIEW_ICON_FALLBACK = "play";
 const NEW_TYP_NAME = "Untitled";
 const NEW_TYP_EXT = `.${TYP_EXTENSION}`;
 const TYP_FILE_EXTENSIONS = [TYP_EXTENSION, "Typ", "TYP"] as const;
@@ -38,6 +41,9 @@ interface TypLifecycleEventTarget {
 export default class TypsidianPlugin extends Plugin {
   private previousActiveLeaf: WorkspaceLeaf | null = null;
   private currentActiveLeaf: WorkspaceLeaf | null = null;
+  private previewCommandController: DefaultPreviewCommandController | null = null;
+  private previewHeaderActions = new Map<WorkspaceLeaf, HTMLElement>();
+  private readonly previewIcon = this.resolvePreviewIcon();
 
   async onload(): Promise<void> {
     this.currentActiveLeaf = this.app.workspace.getMostRecentLeaf();
@@ -47,6 +53,7 @@ export default class TypsidianPlugin extends Plugin {
       this.registerTypLifecycleObserver();
       this.registerTypContextMenuActions();
       this.registerPreviewCommand();
+      this.syncPreviewHeaderAction(this.currentActiveLeaf);
       this.logStartupState();
     });
 
@@ -61,6 +68,8 @@ export default class TypsidianPlugin extends Plugin {
   }
 
   private handleFileOpen = (file: TFile | null): void => {
+    this.syncPreviewHeaderAction(this.app.workspace.getMostRecentLeaf());
+
     if (!file || !this.isTypFile(file)) {
       return;
     }
@@ -94,6 +103,7 @@ export default class TypsidianPlugin extends Plugin {
 
     this.previousActiveLeaf = this.currentActiveLeaf;
     this.currentActiveLeaf = leaf;
+    this.syncPreviewHeaderAction(leaf);
   };
 
   private registerTypLifecycleObserver(): void {
@@ -122,6 +132,7 @@ export default class TypsidianPlugin extends Plugin {
 
   private registerPreviewCommand(): void {
     const commandController = this.createPreviewCommandController();
+    this.previewCommandController = commandController;
 
     this.addCommand({
       id: PREVIEW_COMMAND_ID,
@@ -141,6 +152,52 @@ export default class TypsidianPlugin extends Plugin {
         return true;
       },
     });
+  }
+
+  private syncPreviewHeaderAction(leaf: WorkspaceLeaf | null): void {
+    if (!leaf || !(leaf.view instanceof MarkdownView)) {
+      if (leaf) {
+        this.removePreviewHeaderAction(leaf);
+      }
+      return;
+    }
+
+    const activeFile = leaf.view.file;
+    if (!activeFile || !this.isTypFile(activeFile)) {
+      this.removePreviewHeaderAction(leaf);
+      return;
+    }
+
+    if (!this.previewCommandController || this.previewHeaderActions.has(leaf)) {
+      return;
+    }
+
+    const action = leaf.view.addAction(this.previewIcon, PREVIEW_COMMAND_NAME, () => {
+      void this.runPreviewFromRibbon();
+    });
+    this.previewHeaderActions.set(leaf, action);
+  }
+
+  private removePreviewHeaderAction(leaf: WorkspaceLeaf): void {
+    const action = this.previewHeaderActions.get(leaf);
+    if (!action) {
+      return;
+    }
+
+    action.remove();
+    this.previewHeaderActions.delete(leaf);
+  }
+
+  private async runPreviewFromRibbon(): Promise<void> {
+    if (!this.previewCommandController) {
+      return;
+    }
+
+    if (!this.previewCommandController.isCommandAvailable()) {
+      return;
+    }
+
+    await this.previewCommandController.runFromCurrentContext();
   }
 
   private createPreviewCommandController(): DefaultPreviewCommandController {
@@ -317,7 +374,7 @@ export default class TypsidianPlugin extends Plugin {
     menu.addItem((item) => {
       item
         .setTitle("New Typst")
-        .setIcon("new-file")
+        .setIcon("file-plus-corner")
         .onClick(async () => {
           try {
             const name = await this.resolveUniqueTypFileName(target);
@@ -450,7 +507,20 @@ export default class TypsidianPlugin extends Plugin {
     return `${folderPath}/${fileName}`;
   }
 
+  private resolvePreviewIcon(): string {
+    if (getIcon(PREVIEW_ICON_PRIMARY)) {
+      return PREVIEW_ICON_PRIMARY;
+    }
+
+    return PREVIEW_ICON_FALLBACK;
+  }
+
   onunload(): void {
+    for (const action of this.previewHeaderActions.values()) {
+      action.remove();
+    }
+    this.previewHeaderActions.clear();
+
     console.info("[typsidian] plugin unloaded");
   }
 }
