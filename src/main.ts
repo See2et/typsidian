@@ -1,4 +1,5 @@
 import {
+  getIcon,
   MarkdownView,
   Menu,
   Notice,
@@ -8,9 +9,26 @@ import {
   TFolder,
   WorkspaceLeaf,
 } from "obsidian";
+import { ChildProcess, spawn } from "node:child_process";
+import { join } from "node:path";
+import {
+  PREVIEW_COMMAND_ID,
+  PREVIEW_COMMAND_NAME,
+} from "./preview/contracts";
+import { DefaultPreviewCommandController } from "./preview/previewCommandController";
+import { PreviewContextResolver } from "./preview/previewContextResolver";
+import { PrerequisiteDiscoveryService } from "./preview/prerequisiteDiscoveryService";
+import { PreviewFailurePolicy } from "./preview/previewFailurePolicy";
+import { NodeExternalCliRunner } from "./preview/externalCliRunner";
+import { PreviewOutputPresenter } from "./preview/previewOutputPresenter";
+import { DefaultPreviewExecutionService } from "./preview/previewExecutionService";
+import { PreviewOutputPublisher } from "./preview/previewOutputPublisher";
+import { PluginStateGuard } from "./preview/pluginStateGuard";
 
 const TYP_EXTENSION = "typ";
 const TYP_VIEW = "markdown";
+const PREVIEW_ICON_PRIMARY = "panel-right-open";
+const PREVIEW_ICON_FALLBACK = "play";
 const NEW_TYP_NAME = "Untitled";
 const NEW_TYP_EXT = `.${TYP_EXTENSION}`;
 const TYP_FILE_EXTENSIONS = [TYP_EXTENSION, "Typ", "TYP"] as const;
@@ -23,6 +41,9 @@ interface TypLifecycleEventTarget {
 export default class TypsidianPlugin extends Plugin {
   private previousActiveLeaf: WorkspaceLeaf | null = null;
   private currentActiveLeaf: WorkspaceLeaf | null = null;
+  private previewCommandController: DefaultPreviewCommandController | null = null;
+  private previewHeaderActions = new Map<WorkspaceLeaf, HTMLElement>();
+  private readonly previewIcon = this.resolvePreviewIcon();
 
   async onload(): Promise<void> {
     this.currentActiveLeaf = this.app.workspace.getMostRecentLeaf();
@@ -31,6 +52,8 @@ export default class TypsidianPlugin extends Plugin {
       this.registerExtensions(Array.from(TYP_FILE_EXTENSIONS), TYP_VIEW);
       this.registerTypLifecycleObserver();
       this.registerTypContextMenuActions();
+      this.registerPreviewCommand();
+      this.syncPreviewHeaderAction(this.currentActiveLeaf);
       this.logStartupState();
     });
 
@@ -45,6 +68,8 @@ export default class TypsidianPlugin extends Plugin {
   }
 
   private handleFileOpen = (file: TFile | null): void => {
+    this.syncPreviewHeaderAction(this.app.workspace.getMostRecentLeaf());
+
     if (!file || !this.isTypFile(file)) {
       return;
     }
@@ -78,6 +103,7 @@ export default class TypsidianPlugin extends Plugin {
 
     this.previousActiveLeaf = this.currentActiveLeaf;
     this.currentActiveLeaf = leaf;
+    this.syncPreviewHeaderAction(leaf);
   };
 
   private registerTypLifecycleObserver(): void {
@@ -104,11 +130,254 @@ export default class TypsidianPlugin extends Plugin {
     );
   }
 
+  private registerPreviewCommand(): void {
+    const commandController = this.createPreviewCommandController();
+    this.previewCommandController = commandController;
+
+    this.addCommand({
+      id: PREVIEW_COMMAND_ID,
+      name: PREVIEW_COMMAND_NAME,
+      checkCallback: (checking) => {
+        const isAvailable = commandController.isCommandAvailable();
+
+        if (checking) {
+          return isAvailable;
+        }
+
+        if (!isAvailable) {
+          return false;
+        }
+
+        void commandController.runFromCurrentContext();
+        return true;
+      },
+    });
+  }
+
+  private syncPreviewHeaderAction(leaf: WorkspaceLeaf | null): void {
+    if (!leaf || !(leaf.view instanceof MarkdownView)) {
+      if (leaf) {
+        this.removePreviewHeaderAction(leaf);
+      }
+      return;
+    }
+
+    const activeFile = leaf.view.file;
+    if (!activeFile || !this.isTypFile(activeFile)) {
+      this.removePreviewHeaderAction(leaf);
+      return;
+    }
+
+    if (!this.previewCommandController || this.previewHeaderActions.has(leaf)) {
+      return;
+    }
+
+    const action = leaf.view.addAction(this.previewIcon, PREVIEW_COMMAND_NAME, () => {
+      void this.runPreviewFromRibbon();
+    });
+    this.previewHeaderActions.set(leaf, action);
+  }
+
+  private removePreviewHeaderAction(leaf: WorkspaceLeaf): void {
+    const action = this.previewHeaderActions.get(leaf);
+    if (!action) {
+      return;
+    }
+
+    action.remove();
+    this.previewHeaderActions.delete(leaf);
+  }
+
+  private async runPreviewFromRibbon(): Promise<void> {
+    if (!this.previewCommandController) {
+      return;
+    }
+
+    if (!this.previewCommandController.isCommandAvailable()) {
+      return;
+    }
+
+    await this.previewCommandController.runFromCurrentContext();
+  }
+
+  private createPreviewCommandController(): DefaultPreviewCommandController {
+    const getActiveLike = () => {
+      const activeFile = this.app.workspace.getActiveFile();
+      if (!activeFile) {
+        return null;
+      }
+
+      return {
+        path: activeFile.path,
+        extension: activeFile.extension,
+      };
+    };
+
+    const vaultBasePath = this.getVaultBasePath();
+
+    const runner = new NodeExternalCliRunner();
+    const outputPublisher = new PreviewOutputPublisher();
+    const execution = new DefaultPreviewExecutionService(
+      runner,
+      outputPublisher,
+      {
+        timeoutMs: 100000,
+        cwd: vaultBasePath ?? undefined,
+      },
+    );
+    const presenter = new PreviewOutputPresenter(
+      (path) => this.openInRightPane(path),
+      (path) => this.openBySystem(this.resolveVaultPath(path)),
+      (path) => {
+        void this.revealInOs(this.resolveVaultPath(path));
+      },
+    );
+    const failurePolicy = new PreviewFailurePolicy();
+    const stateGuard = new PluginStateGuard(
+      () => this.currentActiveLeaf,
+      (leaf) => this.restoreActiveLeaf(leaf),
+    );
+    const runtime = new PrerequisiteDiscoveryService({
+      verify: (commandName) =>
+        new Promise<boolean>((resolve) => {
+          const testProcess = spawn(commandName, ["--version"], {
+            stdio: ["ignore", "ignore", "pipe"],
+            cwd: vaultBasePath ?? undefined,
+          });
+
+          testProcess.on("error", () => {
+            resolve(false);
+          });
+
+          testProcess.on("close", (code) => {
+            resolve(code === 0 || code === null);
+          });
+        }),
+    });
+
+    return new DefaultPreviewCommandController({
+      resolver: new PreviewContextResolver(getActiveLike),
+      runtime,
+      execution,
+      presenter,
+      failurePolicy,
+      stateGuard,
+      onNotice: (message) => new Notice(message),
+    });
+  }
+
+  private openBySystem(path: string): Promise<string | null> {
+    return new Promise<string | null>((resolve) => {
+      const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+      const args =
+        process.platform === "win32"
+          ? ["/c", "start", "", path]
+          : process.platform === "darwin"
+            ? [path]
+            : [path];
+
+      let child: ChildProcess;
+      try {
+        child = spawn(command, args, {
+          stdio: ["ignore", "ignore", "pipe"],
+        });
+      } catch (error) {
+        resolve(`open command failed: ${String(error)}`);
+        return;
+      }
+
+      let stderr = "";
+      child.stderr?.on("data", (chunk) => {
+        stderr += String(chunk);
+      });
+
+      child.on("error", (error) => {
+        resolve(`open command failed: ${String(error)}`);
+      });
+
+      child.on("close", (code) => {
+        if (code === 0 || code === null) {
+          resolve(null);
+          return;
+        }
+
+        if (stderr.length > 0) {
+          resolve(`open command failed: ${stderr}`);
+          return;
+        }
+
+        resolve(`open command failed with exit code ${String(code)}`);
+      });
+    });
+  }
+
+  private async openInRightPane(path: string): Promise<void> {
+    const target = this.app.vault.getAbstractFileByPath(path);
+    if (!(target instanceof TFile)) {
+      throw new Error(`artifact is not a vault file: ${path}`);
+    }
+
+    const rightLeaf = this.app.workspace.getLeaf("split", "vertical");
+    await rightLeaf.openFile(target, { active: false });
+  }
+
+  private async revealInOs(path: string): Promise<void> {
+    const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+    const args =
+      process.platform === "win32"
+        ? ["/c", "start", "", path]
+        : process.platform === "darwin"
+          ? ["-R", path]
+          : [path];
+
+    await this.openBySystemWithArgs(command, args);
+  }
+
+  private openBySystemWithArgs(command: string, args: string[]): Promise<void> {
+    return new Promise<void>((resolve) => {
+      let child: ChildProcess;
+      try {
+        child = spawn(command, args, {
+          stdio: ["ignore", "ignore", "ignore"],
+        });
+      } catch {
+        resolve();
+        return;
+      }
+
+      child.on("close", () => resolve());
+      child.on("error", () => resolve());
+    });
+  }
+
+  private resolveVaultPath(relativePath: string): string {
+    const vaultBasePath = this.getVaultBasePath();
+    if (!vaultBasePath) {
+      return relativePath;
+    }
+
+    return join(vaultBasePath, relativePath);
+  }
+
+  private getVaultBasePath(): string | null {
+    const adapter = this.app.vault.adapter;
+    const maybeGetBasePath =
+      "getBasePath" in adapter && typeof adapter.getBasePath === "function"
+        ? adapter.getBasePath
+        : null;
+
+    if (!maybeGetBasePath) {
+      return null;
+    }
+
+    return maybeGetBasePath.call(adapter);
+  }
+
   private addNewTypContextMenuItem(menu: Menu, target: TFolder): void {
     menu.addItem((item) => {
       item
         .setTitle("New Typst")
-        .setIcon("new-file")
+        .setIcon("file-plus-corner")
         .onClick(async () => {
           try {
             const name = await this.resolveUniqueTypFileName(target);
@@ -241,7 +510,20 @@ export default class TypsidianPlugin extends Plugin {
     return `${folderPath}/${fileName}`;
   }
 
+  private resolvePreviewIcon(): string {
+    if (getIcon(PREVIEW_ICON_PRIMARY)) {
+      return PREVIEW_ICON_PRIMARY;
+    }
+
+    return PREVIEW_ICON_FALLBACK;
+  }
+
   onunload(): void {
+    for (const action of this.previewHeaderActions.values()) {
+      action.remove();
+    }
+    this.previewHeaderActions.clear();
+
     console.info("[typsidian] plugin unloaded");
   }
 }
