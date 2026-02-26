@@ -3,9 +3,6 @@ dist/
 *.log
 
 # Obsidian debug vault runtime files
-debug-vault/.obsidian/*
-!debug-vault/.obsidian/.gitkeep
-debug-vault/.hotreload
 # Ignore debug-vault data files (regenerated via setup)
 debug-vault/
 
@@ -19,5 +16,4 @@ specs/
 !.kiro/steering/**
 !.kiro/settings/**
 .kiro/specs/
-!AGENTS.md
 .opencode/
