@@ -30,6 +30,8 @@ export class PrerequisiteDiscoveryService {
   }
 
   public resetRuntimeCache(): void {
+    // No-op: runtime cache is not implemented yet.
+    void 0;
   }
 
   private classifyError(error: unknown): "MISSING_RUNTIME" | "INVALID_PATH" {

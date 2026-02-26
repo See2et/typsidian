@@ -220,7 +220,10 @@ export default class TypsidianPlugin extends Plugin {
     const execution = new DefaultPreviewExecutionService(
       runner,
       outputPublisher,
-      vaultBasePath ? { cwd: vaultBasePath } : {},
+      {
+        timeoutMs: 100000,
+        cwd: vaultBasePath ?? undefined,
+      },
     );
     const presenter = new PreviewOutputPresenter(
       (path) => this.openInRightPane(path),
@@ -268,7 +271,7 @@ export default class TypsidianPlugin extends Plugin {
       const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
       const args =
         process.platform === "win32"
-          ? ["/c", "start", path]
+          ? ["/c", "start", "", path]
           : process.platform === "darwin"
             ? [path]
             : [path];
@@ -322,7 +325,7 @@ export default class TypsidianPlugin extends Plugin {
     const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
     const args =
       process.platform === "win32"
-        ? ["/c", "start", path]
+        ? ["/c", "start", "", path]
         : process.platform === "darwin"
           ? ["-R", path]
           : [path];

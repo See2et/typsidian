@@ -1,4 +1,4 @@
-import { access } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { dirname, extname, basename, join } from "node:path";
 
 import { PreviewTarget } from "./contracts";
@@ -19,8 +19,8 @@ export class PreviewOutputPublisher implements PreviewOutputPublishContract {
 
   public async ensureArtifactExists(path: string): Promise<boolean> {
     try {
-      await access(path);
-      return true;
+      const entry = await stat(path);
+      return entry.isFile();
     } catch {
       return false;
     }

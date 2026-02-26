@@ -47,7 +47,7 @@ export class NodeExternalCliRunner implements ExternalCliRunner {
 
       const processOptions: SpawnOptions = {
         cwd: options.cwd,
-        env: options.env,
+        env: options.env ? { ...process.env, ...options.env } : process.env,
       };
 
       let child: ChildProcess;

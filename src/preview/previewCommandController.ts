@@ -39,6 +39,7 @@ export class DefaultPreviewCommandController
 
   public async runFromCurrentContext(): Promise<PreviewFlowResult> {
     return this.deps.stateGuard.withLeafPreserved(async () => {
+      let artifactPath: string | undefined;
       const targetResult = this.deps.resolver.resolveTargetForCommand();
       if (!targetResult.ok) {
         const message = "Typst ファイルが選択されていません。現在の編集対象を確認してください。";
@@ -67,7 +68,8 @@ export class DefaultPreviewCommandController
           targetResult.target,
           runtimeResult.resolvedCommand,
         );
-        await this.deps.presenter.openArtifact(executionResult.artifactPath);
+        artifactPath = executionResult.artifactPath;
+        await this.deps.presenter.openArtifact(artifactPath);
 
         return {
           ok: true,
@@ -77,10 +79,14 @@ export class DefaultPreviewCommandController
       } catch (error) {
         const fallbackMessage = error instanceof Error ? error.message : "unknown";
         const category = this.deps.failurePolicy.classify(error, fallbackMessage);
+        const artifactPathFromError =
+          error instanceof Error
+            ? /artifact not found:\s*(.+)$/i.exec(error.message)?.[1]
+            : undefined;
 
         return this.presentFailure(category, fallbackMessage, {
           command: runtimeResult.resolvedCommand,
-          path: targetResult.target.filePath,
+          path: artifactPathFromError ?? artifactPath ?? targetResult.target.filePath,
           reason: fallbackMessage,
         },
         error);

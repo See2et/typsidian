@@ -2,7 +2,7 @@ import { WorkspaceLeaf } from "obsidian";
 
 export interface PluginStateGuardContract {
   withLeafPreserved<T>(action: () => Promise<T>): Promise<T>;
-  restoreActiveLeafIfNeeded(): void;
+  restoreActiveLeafIfNeeded(expectedLeaf: WorkspaceLeaf | null): void;
 }
 
 export class PluginStateGuard implements PluginStateGuardContract {
@@ -11,21 +11,17 @@ export class PluginStateGuard implements PluginStateGuardContract {
     private readonly restoreLeaf: (leaf: WorkspaceLeaf | null) => void,
   ) {}
 
-  private leafToRestore: WorkspaceLeaf | null = null;
-
   public async withLeafPreserved<T>(action: () => Promise<T>): Promise<T> {
     const previousLeaf = this.currentLeafProvider();
-    this.leafToRestore = previousLeaf;
     try {
       return await action();
     } finally {
-      this.restoreActiveLeafIfNeeded();
-      this.leafToRestore = null;
+      this.restoreActiveLeafIfNeeded(previousLeaf);
     }
   }
 
-  public restoreActiveLeafIfNeeded(): void {
-    this.restoreIfChanged(this.leafToRestore);
+  public restoreActiveLeafIfNeeded(expectedLeaf: WorkspaceLeaf | null): void {
+    this.restoreIfChanged(expectedLeaf);
   }
 
   private restoreIfChanged(expectedLeaf: WorkspaceLeaf | null): void {

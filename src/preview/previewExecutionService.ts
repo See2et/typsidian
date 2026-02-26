@@ -1,4 +1,4 @@
-import { isAbsolute, join } from "node:path";
+import { basename, dirname, extname, isAbsolute, join } from "node:path";
 
 import {
   PreviewExecutionResult,
@@ -64,7 +64,7 @@ export class DefaultPreviewExecutionService implements PreviewExecutionService {
       return join(this.runOptions.cwd, artifactPath);
     }
 
-    return artifactPath;
+    return join(process.cwd(), artifactPath);
   }
 }
 
@@ -77,9 +77,12 @@ export class StubPreviewExecutionService implements PreviewExecutionService {
 
   public async executePreview(target: PreviewTarget, command: string): Promise<PreviewExecutionResult> {
     await this.simulate(target, command);
+    const fileName = basename(target.filePath);
+    const stem = fileName.slice(0, fileName.length - extname(fileName).length);
+    const artifactPath = join(dirname(target.filePath), `${stem}.pdf`);
 
     return {
-      artifactPath: join(target.filePath, "..", "preview.pdf"),
+      artifactPath,
       deterministicKey: target.filePath,
       commandRunAt: new Date().toISOString(),
       processRun: {
