@@ -166,6 +166,7 @@ export default class TypsidianPlugin extends Plugin {
       vaultBasePath ? { cwd: vaultBasePath } : {},
     );
     const presenter = new PreviewOutputPresenter(
+      (path) => this.openInRightPane(path),
       (path) => this.openBySystem(this.resolveVaultPath(path)),
       (path) => {
         void this.revealInOs(this.resolveVaultPath(path));
@@ -248,6 +249,16 @@ export default class TypsidianPlugin extends Plugin {
         resolve(`open command failed with exit code ${String(code)}`);
       });
     });
+  }
+
+  private async openInRightPane(path: string): Promise<void> {
+    const target = this.app.vault.getAbstractFileByPath(path);
+    if (!(target instanceof TFile)) {
+      throw new Error(`artifact is not a vault file: ${path}`);
+    }
+
+    const rightLeaf = this.app.workspace.getLeaf("split", "vertical");
+    await rightLeaf.openFile(target, { active: false });
   }
 
   private async revealInOs(path: string): Promise<void> {

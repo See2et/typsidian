@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 import {
   PreviewExecutionResult,
@@ -41,9 +41,10 @@ export class DefaultPreviewExecutionService implements PreviewExecutionService {
       });
     }
 
-    const exists = await this.publisher.ensureArtifactExists(artifactPath);
+    const artifactPathForCheck = this.resolveArtifactPathForCheck(artifactPath);
+    const exists = await this.publisher.ensureArtifactExists(artifactPathForCheck);
     if (!exists) {
-      throw new Error(`artifact not found: ${artifactPath}`);
+      throw new Error(`artifact not found: ${artifactPathForCheck}`);
     }
 
     return {
@@ -52,6 +53,18 @@ export class DefaultPreviewExecutionService implements PreviewExecutionService {
       commandRunAt: new Date().toISOString(),
       processRun: runResult,
     };
+  }
+
+  private resolveArtifactPathForCheck(artifactPath: string): string {
+    if (isAbsolute(artifactPath)) {
+      return artifactPath;
+    }
+
+    if (typeof this.runOptions.cwd === "string" && this.runOptions.cwd.length > 0) {
+      return join(this.runOptions.cwd, artifactPath);
+    }
+
+    return artifactPath;
   }
 }
 
