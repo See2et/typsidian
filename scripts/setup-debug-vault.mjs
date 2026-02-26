@@ -2,7 +2,7 @@ import { readlink, realpath, mkdir, readFile, symlink, writeFile, lstat, rm } fr
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)));
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const vaultDir = resolve(root, "debug-vault");
 const obsidianDir = resolve(vaultDir, ".obsidian");
 const pluginsDir = resolve(obsidianDir, "plugins");

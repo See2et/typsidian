@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)));
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const vaultPluginsDir = resolve(root, "debug-vault", ".obsidian", "plugins");
 const hotReloadDir = resolve(vaultPluginsDir, "hot-reload");
 const communityPluginsPath = resolve(root, "debug-vault", ".obsidian", "community-plugins.json");
