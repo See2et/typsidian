@@ -16,4 +16,3 @@ specs/
 !.kiro/steering/**
 !.kiro/settings/**
 .kiro/specs/
-.opencode/
